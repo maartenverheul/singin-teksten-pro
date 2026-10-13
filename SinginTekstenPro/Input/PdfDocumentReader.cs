@@ -11,9 +11,9 @@ static class PdfDocumentReader
 
     sealed record PdfLine(string Text, double Left);
 
-    public static DocumentContent Read(string path)
+    public static DocumentContent Read(Stream stream)
     {
-        using var document = PdfDocument.Open(path);
+        using var document = PdfDocument.Open(stream);
         var extractor = NearestNeighbourWordExtractor.Instance;
         var lines = new List<PdfLine>();
 

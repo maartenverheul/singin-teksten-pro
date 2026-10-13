@@ -1,0 +1,68 @@
+﻿@page "/"
+@inject IJSRuntime JS
+@using SinginTekstenPro
+
+<PageTitle>Singin Teksten Pro</PageTitle>
+
+<main>
+    <h1>Singin Teksten Pro</h1>
+    <p>Upload a PDF or Word document. The ProPresenter bundle is created in your browser and downloaded to this computer.</p>
+
+    <label class="upload">
+        <InputFile OnChange="ConvertAsync" accept=".pdf,.docx" disabled="@busy" />
+        @(busy ? "Converting…" : "Choose a PDF or Word document")
+    </label>
+    <p class="hint">PDF and Word documents up to 20 MB.</p>
+
+    @if (!string.IsNullOrEmpty(status))
+    {
+        <p class="status">@status</p>
+    }
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <p class="error">@error</p>
+    }
+</main>
+
+@code {
+    const long MaxBytes = 20 * 1024 * 1024;
+
+    bool busy;
+    string? error;
+    string? status;
+
+    async Task ConvertAsync(InputFileChangeEventArgs change)
+    {
+        error = null;
+        status = null;
+        var file = change.File;
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (extension is not ".pdf" and not ".docx")
+        {
+            error = $"Unsupported file type: {extension}";
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            await using var upload = file.OpenReadStream(MaxBytes);
+            using var input = new MemoryStream();
+            await upload.CopyToAsync(input);
+            input.Position = 0;
+
+            var bundle = Conversion.ToProBundle(file.Name, input);
+            var downloadName = Path.GetFileNameWithoutExtension(file.Name) + ".proBundle";
+            await JS.InvokeVoidAsync("downloadFile", downloadName, bundle);
+            status = $"Downloaded {downloadName}.";
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
+        {
+            error = exception.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

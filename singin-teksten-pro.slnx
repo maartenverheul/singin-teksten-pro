@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="SinginTekstenPro.Cli/SinginTekstenPro.Cli.csproj" />
+  <Project Path="SinginTekstenPro.Web/SinginTekstenPro.Web.csproj" />
   <Project Path="SinginTekstenPro/SinginTekstenPro.csproj" />
 </Solution>

@@ -1,8 +1,7 @@
-﻿using SinginTekstenPro.Input;
-using SinginTekstenPro.Output;
+using SinginTekstenPro;
 using System.Text;
 
-namespace SinginTekstenPro;
+namespace SinginTekstenPro.Cli;
 
 static class Program
 {
@@ -28,7 +27,9 @@ static class Program
             var fullPath = Path.GetFullPath(path);
             var directory = Path.GetDirectoryName(fullPath) ?? ".";
             var bundlePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(fullPath) + ".proBundle");
-            Console.WriteLine(ProPresenterExporter.Export(SongParser.Parse(Read(path)), bundlePath));
+            using var input = File.OpenRead(fullPath);
+            File.WriteAllBytes(bundlePath, Conversion.ToProBundle(fullPath, input));
+            Console.WriteLine(bundlePath);
 
             return 0;
         }
@@ -37,15 +38,5 @@ static class Program
             Console.Error.WriteLine(exception.Message);
             return 1;
         }
-    }
-
-    static DocumentContent Read(string path)
-    {
-        return Path.GetExtension(path).ToLowerInvariant() switch
-        {
-            ".docx" => DocxDocumentReader.Read(path),
-            ".pdf" => PdfDocumentReader.Read(path),
-            var extension => throw new ArgumentException($"Unsupported file type: {extension}"),
-        };
     }
 }

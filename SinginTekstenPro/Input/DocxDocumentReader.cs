@@ -5,9 +5,9 @@ namespace SinginTekstenPro.Input;
 
 static class DocxDocumentReader
 {
-    public static DocumentContent Read(string path)
+    public static DocumentContent Read(Stream stream)
     {
-        using var document = WordprocessingDocument.Open(path, false);
+        using var document = WordprocessingDocument.Open(stream, false);
         var body = document.MainDocumentPart?.Document?.Body
             ?? throw new InvalidDataException("The document has no body.");
 

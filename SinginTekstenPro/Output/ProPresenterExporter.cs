@@ -13,10 +13,10 @@ static class ProPresenterExporter
 
     static readonly Presentation Template = LoadTemplate();
 
-    public static string Export(IReadOnlyList<Song> songs, string path)
+    public static byte[] Export(IReadOnlyList<Song> songs)
     {
-        using (var stream = File.Create(path))
-        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
             var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var song in songs)
@@ -30,7 +30,7 @@ static class ProPresenterExporter
             archive.CreateEntry("PDF/");
         }
 
-        return path;
+        return stream.ToArray();
     }
 
     static Presentation Build(Song song)
@@ -223,7 +223,7 @@ static class ProPresenterExporter
 
     static Presentation LoadTemplate()
     {
-        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("SinginTekstenPro.First.pro")
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("SinginTekstenPro.Template.pro")
             ?? throw new InvalidOperationException("The ProPresenter slide template is missing.");
         using (stream)
         {
