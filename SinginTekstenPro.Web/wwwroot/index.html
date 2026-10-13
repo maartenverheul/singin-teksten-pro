@@ -8,6 +8,7 @@
     <base href="/" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="css/app.css" />
+    <script src="js/theme.js"></script>
     <!-- If you add any scoped CSS files, uncomment the following to load them
     <link href="SinginTekstenPro.Web.styles.css" rel="stylesheet" /> -->
     <script type="importmap"></script>
@@ -28,6 +29,192 @@
         <span class="dismiss">🗙</span>
     </div>
     <script src="js/download.js"></script>
+    <script src="js/review-guard.js"></script>
+    <script>
+        const dropLog = (...args) => console.log("[filedrop]", ...args);
+        let lastOverLog = 0;
+
+        window.fileDrop = {
+            dotNet: null,
+            init(dotNet) {
+                dropLog("init", dotNet ? "with .NET reference" : "WITHOUT .NET reference");
+                this.dotNet = dotNet;
+            },
+            isFileDrag(event) {
+                try {
+                    const types = event.dataTransfer && event.dataTransfer.types;
+                    if (!types) {
+                        return false;
+                    }
+
+                    for (let index = 0; index < types.length; index++) {
+                        const type = String(types[index]).toLowerCase();
+                        if (type === "files" || type === "application/x-moz-file") {
+                            return true;
+                        }
+                    }
+                } catch (error) {
+                    dropLog("isFileDrag failed", error);
+                    return false;
+                }
+
+                return false;
+            },
+            async receive(event) {
+                const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+                dropLog("receive", {
+                    file: file ? { name: file.name, size: file.size, type: file.type } : null,
+                    hasDotNet: !!this.dotNet,
+                });
+                if (!file || !this.dotNet) {
+                    dropLog("receive stopped:", !file ? "no file" : "no .NET reference");
+                    return;
+                }
+
+                try {
+                    const bytes = new Uint8Array(await file.arrayBuffer());
+                    dropLog("read bytes", bytes.length);
+                    await this.dotNet.invokeMethodAsync("ReceiveDroppedFile", file.name, bytes);
+                    dropLog("ReceiveDroppedFile finished");
+                } catch (error) {
+                    console.error("[filedrop] receive failed", error);
+                }
+            }
+        };
+
+        const showDrop = (event) => {
+            const isFile = window.fileDrop.isFileDrag(event);
+            if (event.type !== "dragover" || Date.now() - lastOverLog > 1000) {
+                lastOverLog = Date.now();
+                dropLog(event.type, {
+                    isFile,
+                    types: event.dataTransfer ? [...event.dataTransfer.types] : null,
+                    target: event.target && (event.target.id || event.target.className || event.target.nodeName),
+                });
+            }
+
+            if (!isFile) {
+                return;
+            }
+
+            event.preventDefault();
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = "copy";
+            }
+
+            document.documentElement.classList.add("dropping");
+        };
+
+        window.addEventListener("dragenter", showDrop, true);
+        window.addEventListener("dragover", showDrop, true);
+        window.addEventListener("dragleave", (event) => {
+            dropLog("dragleave", {
+                target: event.target && (event.target.id || event.target.className || event.target.nodeName),
+                clientX: event.clientX,
+                clientY: event.clientY,
+            });
+        }, true);
+        window.addEventListener("dragend", () => {
+            dropLog("dragend");
+            document.documentElement.classList.remove("dropping");
+        }, true);
+        window.addEventListener("drop", (event) => {
+            const isFile = window.fileDrop.isFileDrag(event);
+            const fileCount = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files.length : 0;
+            dropLog("drop", {
+                isFile,
+                fileCount,
+                types: event.dataTransfer ? [...event.dataTransfer.types] : null,
+                target: event.target && (event.target.id || event.target.className || event.target.nodeName),
+                hasDotNet: !!window.fileDrop.dotNet,
+            });
+            if (!isFile && !fileCount) {
+                dropLog("drop ignored: not a file drag");
+                return;
+            }
+
+            event.preventDefault();
+            document.documentElement.classList.remove("dropping");
+            if (window.fileDrop.dotNet) {
+                event.stopPropagation();
+                window.fileDrop.receive(event);
+            } else {
+                dropLog("drop not handled: .NET reference is not registered yet");
+            }
+        }, true);
+        dropLog("listeners registered");
+
+        function lineCount(value) {
+            return String(value ?? "").split(/\r\n|\r|\n/).length;
+        }
+
+        window.focusTextArea = (id) => {
+            const area = document.getElementById(id);
+            if (!area) {
+                return;
+            }
+
+            area.focus();
+            area.setSelectionRange(0, 0);
+            area.closest(".slide")?.scrollIntoView({ block: "nearest" });
+        };
+
+        document.addEventListener("keydown", (event) => {
+            const area = event.target;
+            if (!(area instanceof HTMLTextAreaElement) || !area.classList.contains("lyric") || area.disabled) {
+                return;
+            }
+
+            if (event.key !== "Enter" || event.isComposing) {
+                return;
+            }
+
+            const max = Number(area.dataset.maxLines) || 2;
+            if (lineCount(area.value) < max) {
+                return;
+            }
+
+            event.preventDefault();
+            if (!window.fileDrop.dotNet) {
+                return;
+            }
+
+            const start = area.selectionStart ?? area.value.length;
+            const end = area.selectionEnd ?? start;
+            const before = area.value.slice(0, start);
+            const after = area.value.slice(end);
+            window.fileDrop.dotNet.invokeMethodAsync(
+                "SplitSlide",
+                Number(area.dataset.group),
+                Number(area.dataset.slide),
+                before,
+                after).catch((error) => console.error("[lyric] split failed", error));
+        }, true);
+
+        document.addEventListener("input", (event) => {
+            const area = event.target;
+            if (!(area instanceof HTMLTextAreaElement) || !area.classList.contains("lyric") || area.disabled) {
+                return;
+            }
+
+            const max = Number(area.dataset.maxLines) || 2;
+            const count = lineCount(area.value);
+            area.rows = Math.min(Math.max(count, 1), max);
+            if (count <= max || !window.fileDrop.dotNet) {
+                return;
+            }
+
+            const value = area.value;
+            const kept = value.split(/\r\n|\r|\n/).slice(0, max).join("\n");
+            area.value = kept;
+            window.fileDrop.dotNet.invokeMethodAsync(
+                "SplitSlide",
+                Number(area.dataset.group),
+                Number(area.dataset.slide),
+                value,
+                "").catch((error) => console.error("[lyric] split failed", error));
+        }, true);
+    </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

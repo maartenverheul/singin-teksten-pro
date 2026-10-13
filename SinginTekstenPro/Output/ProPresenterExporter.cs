@@ -18,12 +18,24 @@ static class ProPresenterExporter
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
+            WriteSongs(archive, songs);
+            archive.CreateEntry("Media/");
+            archive.CreateEntry("PDF/");
+        }
+
+        return stream.ToArray();
+    }
+
+    public static async Task<byte[]> ExportAsync(IReadOnlyList<Song> songs)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
             var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var song in songs)
             {
-                var entry = archive.CreateEntry(UniqueName(Sanitize(song.Name), usedNames) + ".pro");
-                using var entryStream = entry.Open();
-                Build(song).WriteTo(entryStream);
+                WriteSong(archive, song, usedNames);
+                await Task.Delay(1);
             }
 
             archive.CreateEntry("Media/");
@@ -31,6 +43,22 @@ static class ProPresenterExporter
         }
 
         return stream.ToArray();
+    }
+
+    static void WriteSongs(ZipArchive archive, IReadOnlyList<Song> songs)
+    {
+        var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var song in songs)
+        {
+            WriteSong(archive, song, usedNames);
+        }
+    }
+
+    static void WriteSong(ZipArchive archive, Song song, HashSet<string> usedNames)
+    {
+        var entry = archive.CreateEntry(UniqueName(Sanitize(song.Name), usedNames) + ".pro");
+        using var entryStream = entry.Open();
+        Build(song).WriteTo(entryStream);
     }
 
     static Presentation Build(Song song)
@@ -86,12 +114,8 @@ static class ProPresenterExporter
 
     static List<Cue> CreateSlides(Cue templateCue, Groups group)
     {
-        var lines = group.Slides.SelectMany(slide => slide.Lines).ToList();
-        var chunks = lines.Count == 0
-            ? [Array.Empty<string>()]
-            : lines.Chunk(2).Select(chunk => chunk.ToArray()).ToList();
-
-        return chunks.Select(chunk => CreateCue(templateCue, chunk)).ToList();
+        var slides = group.Slides.Count == 0 ? [new Models.Slide()] : group.Slides;
+        return slides.Select(slide => CreateCue(templateCue, slide.Lines)).ToList();
     }
 
     static Cue CreateCue(Cue templateCue, IReadOnlyList<string> lines)
@@ -193,32 +217,8 @@ static class ProPresenterExporter
 
     static Color ColorFor(string name)
     {
-        if (name.StartsWith("Pre-Chorus", StringComparison.Ordinal))
-        {
-            return new Color { Red = 0.95f, Green = 0.6f, Blue = 0.15f, Alpha = 1 };
-        }
-
-        if (name.StartsWith("Verse", StringComparison.Ordinal))
-        {
-            return new Color { Green = 0.46666667f, Blue = 0.8f, Alpha = 1 };
-        }
-
-        if (name.StartsWith("Chorus", StringComparison.Ordinal))
-        {
-            return new Color { Red = 0.8f, Blue = 0.30588236f, Alpha = 1 };
-        }
-
-        if (name.StartsWith("Bridge", StringComparison.Ordinal))
-        {
-            return new Color { Red = 0.55f, Blue = 0.85f, Alpha = 1 };
-        }
-
-        if (name.Equals("Interlude", StringComparison.Ordinal))
-        {
-            return new Color { Red = 0.45f, Green = 0.45f, Blue = 0.45f, Alpha = 1 };
-        }
-
-        return new Color { Red = 0.2f, Green = 0.7f, Blue = 0.45f, Alpha = 1 };
+        var (red, green, blue) = GroupColors.Rgb(name);
+        return new Color { Red = red / 255f, Green = green / 255f, Blue = blue / 255f, Alpha = 1 };
     }
 
     static Presentation LoadTemplate()

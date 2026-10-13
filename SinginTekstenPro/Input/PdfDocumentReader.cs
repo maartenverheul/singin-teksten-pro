@@ -14,29 +14,50 @@ static class PdfDocumentReader
     public static DocumentContent Read(Stream stream)
     {
         using var document = PdfDocument.Open(stream);
-        var extractor = NearestNeighbourWordExtractor.Instance;
         var lines = new List<PdfLine>();
-
         foreach (var page in document.GetPages())
         {
-            var words = extractor
-                .GetWords(page.Letters)
-                .Where(word => !string.IsNullOrWhiteSpace(word.Text))
-                .ToList();
-
-            foreach (var line in GroupLines(words))
-            {
-                var left = line.Min(word => word.BoundingBox.Left);
-                var text = FirstColumnText(line, page.Width);
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    continue;
-                }
-
-                lines.Add(new PdfLine(text.Trim(), left));
-            }
+            Collect(page, lines);
         }
 
+        return Finish(lines);
+    }
+
+    public static async Task<DocumentContent> ReadAsync(Stream stream)
+    {
+        using var document = PdfDocument.Open(stream);
+        var lines = new List<PdfLine>();
+        foreach (var page in document.GetPages())
+        {
+            Collect(page, lines);
+            await Task.Delay(1);
+        }
+
+        return Finish(lines);
+    }
+
+    static void Collect(Page page, List<PdfLine> lines)
+    {
+        var words = NearestNeighbourWordExtractor.Instance
+            .GetWords(page.Letters)
+            .Where(word => !string.IsNullOrWhiteSpace(word.Text))
+            .ToList();
+
+        foreach (var line in GroupLines(words))
+        {
+            var left = line.Min(word => word.BoundingBox.Left);
+            var text = FirstColumnText(line, page.Width);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            lines.Add(new PdfLine(text.Trim(), left));
+        }
+    }
+
+    static DocumentContent Finish(List<PdfLine> lines)
+    {
         if (lines.Count == 0)
         {
             return new DocumentContent([]);

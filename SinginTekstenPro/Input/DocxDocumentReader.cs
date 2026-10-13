@@ -11,32 +11,57 @@ static class DocxDocumentReader
         var body = document.MainDocumentPart?.Document?.Body
             ?? throw new InvalidDataException("The document has no body.");
 
+        return ReadBody(body);
+    }
+
+    public static async Task<DocumentContent> ReadAsync(Stream stream)
+    {
+        using var document = WordprocessingDocument.Open(stream, false);
+        var body = document.MainDocumentPart?.Document?.Body
+            ?? throw new InvalidDataException("The document has no body.");
         var blocks = new List<ContentBlock>();
         foreach (var child in body.ChildElements)
         {
-            switch (child)
-            {
-                case Paragraph paragraph:
-                    AddBlock(blocks, ContentKind.Text, LinesOf(paragraph));
-                    break;
-                case Table table:
-                    foreach (var row in table.Elements<TableRow>())
-                    {
-                        var cell = row.Elements<TableCell>().FirstOrDefault();
-                        if (cell is null)
-                        {
-                            continue;
-                        }
-
-                        var lines = cell.Elements<Paragraph>().SelectMany(LinesOf).ToList();
-                        AddBlock(blocks, ContentKind.Row, lines);
-                    }
-
-                    break;
-            }
+            AddChild(blocks, child);
+            await Task.Delay(1);
         }
 
         return new DocumentContent(blocks);
+    }
+
+    static DocumentContent ReadBody(Body body)
+    {
+        var blocks = new List<ContentBlock>();
+        foreach (var child in body.ChildElements)
+        {
+            AddChild(blocks, child);
+        }
+
+        return new DocumentContent(blocks);
+    }
+
+    static void AddChild(List<ContentBlock> blocks, DocumentFormat.OpenXml.OpenXmlElement child)
+    {
+        switch (child)
+        {
+            case Paragraph paragraph:
+                AddBlock(blocks, ContentKind.Text, LinesOf(paragraph));
+                break;
+            case Table table:
+                foreach (var row in table.Elements<TableRow>())
+                {
+                    var cell = row.Elements<TableCell>().FirstOrDefault();
+                    if (cell is null)
+                    {
+                        continue;
+                    }
+
+                    var lines = cell.Elements<Paragraph>().SelectMany(LinesOf).ToList();
+                    AddBlock(blocks, ContentKind.Row, lines);
+                }
+
+                break;
+        }
     }
 
     static void AddBlock(List<ContentBlock> blocks, ContentKind kind, IEnumerable<string> lines)

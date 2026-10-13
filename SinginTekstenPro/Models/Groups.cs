@@ -1,6 +1,6 @@
 namespace SinginTekstenPro.Models;
 
-internal class Groups
+public class Groups
 {
     public required string Name { get; set; }
     public required string RawText { get; set; }

@@ -1,60 +1,365 @@
 ﻿@page "/"
 @inject IJSRuntime JS
 @using SinginTekstenPro
+@using SinginTekstenPro.Models
+@using System.Text
+@implements IDisposable
 
 <PageTitle>Singin Teksten Pro</PageTitle>
 
-<main>
-    <h1>Singin Teksten Pro</h1>
-    <p>Upload a PDF or Word document. The ProPresenter bundle is created in your browser and downloaded to this computer.</p>
+<div class="shell">
+    <div class="topbar">
+        <button type="button" class="theme-switch secondary" aria-pressed="@dark"
+            aria-label="@(dark ? "Light mode" : "Dark mode")" @onclick="ToggleThemeAsync">
+            <Icon Name="@(dark ? "sun" : "moon")" />
+        </button>
+    </div>
 
-    <label class="upload">
-        <InputFile OnChange="ConvertAsync" accept=".pdf,.docx" disabled="@busy" />
-        @(busy ? "Converting…" : "Choose a PDF or Word document")
-    </label>
-    <p class="hint">PDF and Word documents up to 20 MB.</p>
+    @if (songs is null)
+    {
+        <main>
+            <h1>Singin Teksten Pro</h1>
+            <p>Upload a PDF or Word document. You can check and edit the songs before downloading them.</p>
 
-    @if (!string.IsNullOrEmpty(status))
-    {
-        <p class="status">@status</p>
+            <label class="upload">
+                <Icon Name="upload" />
+                <InputFile OnChange="UploadAsync" accept=".pdf,.docx" disabled="@busy" />
+                @(busy ? "Reading…" : "Choose a PDF or Word document")
+            </label>
+            <details class="advanced">
+                <summary>
+                    <Icon Name="chevron" />
+                    Advanced settings
+                </summary>
+                <div class="advanced-panel">
+                    <div class="setting">
+                        <span>Lines per slide</span>
+                        <div class="stepper" role="group" aria-label="Lines per slide">
+                            @for (var count = 1; count <= 8; count++)
+                            {
+                                var lines = count;
+                                <button type="button" class="@(lines == LinesPerSlide ? "selected" : null)"
+                                    aria-pressed="@(lines == LinesPerSlide)" @onclick="() => LinesPerSlide = lines">
+                                    @lines
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <label class="setting">
+                        <span>Add blank intro slide</span>
+                        <input type="checkbox" class="switch" role="switch" @bind="addBlankIntro" />
+                    </label>
+                </div>
+            </details>
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <p class="error">@error</p>
+            }
+        </main>
     }
-    @if (!string.IsNullOrEmpty(error))
+    else
     {
-        <p class="error">@error</p>
+        <main class="review-page">
+            <div class="review-header">
+                <div>
+                    <h1>Review</h1>
+                </div>
+                <div class="actions">
+                    <button type="button" class="primary" disabled="@busy" @onclick="DownloadBundleAsync">
+                        <Icon Name="download" />
+                        ProPresenter
+                    </button>
+                    <button type="button" class="secondary" disabled="@busy" @onclick="DownloadMarkdownAsync">
+                        <Icon Name="file" />
+                        Markdown
+                    </button>
+                    <button type="button" class="secondary" disabled="@busy" @onclick="DownloadJsonAsync">
+                        <Icon Name="braces" />
+                        JSON
+                    </button>
+                    <button type="button" class="secondary" disabled="@busy" @onclick="StartOver">
+                        <Icon Name="folder" />
+                        Choose another file
+                    </button>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <p class="error">@error</p>
+            }
+            @if (!string.IsNullOrEmpty(status))
+            {
+                <p class="status">@status</p>
+            }
+
+            <label>
+                Service
+                <input @bind="serviceName" />
+            </label>
+
+            @if (songs.Count == 0)
+            {
+                <p>This document has no songs.</p>
+            }
+            else
+            {
+                <div class="review">
+                    <nav class="song-list">
+                        @for (var index = 0; index < songs.Count; index++)
+                        {
+                            var songIndex = index;
+                            <button type="button" class="@(songIndex == selected ? "selected" : null)"
+                                @onclick="() => selected = songIndex">
+                                <span class="song-index">@(songIndex + 1)</span>
+                                <span>@(string.IsNullOrWhiteSpace(songs[songIndex].Name) ? "Untitled" : songs[songIndex].Name)</span>
+                            </button>
+                        }
+                    </nav>
+
+                    <section>
+                        <label>
+                            Song
+                            <input @bind="song.Name" />
+                        </label>
+                        <p class="hint">Order</p>
+                        <ol class="order">
+                            @foreach (var item in song.GroupOrder)
+                            {
+                                var group = item;
+                                <li>
+                                    <button type="button" style="@GroupStyle(group.Name)"
+                                        @onclick="() => ScrollToGroupAsync(group)">
+                                        @group.Name
+                                    </button>
+                                </li>
+                            }
+                        </ol>
+
+                        <div class="groups">
+                            @for (var groupIndex = 0; groupIndex < song.Groups.Count; groupIndex++)
+                            {
+                                var group = song.Groups[groupIndex];
+                                var groupStart = song.Groups.Take(groupIndex).Sum(item => item.Slides.Count);
+                                <article id="@GroupDomId(group)" class="group" style="@GroupStyle(group.Name)">
+                                    <div class="group-rail">
+                                        <input class="group-name" aria-label="Group name" @bind="group.Name" />
+                                    </div>
+                                    <div class="group-slides">
+                                        @for (var slideIndex = 0; slideIndex < group.Slides.Count; slideIndex++)
+                                        {
+                                            var slide = group.Slides[slideIndex];
+                                            var currentGroup = groupIndex;
+                                            var currentSlide = slideIndex;
+                                            var number = groupStart + slideIndex + 1;
+                                            var open = !collapsed.Contains(slide);
+                                            <div class="slide" @key="slide">
+                                                <div class="slide-bar">
+                                                    <span>@number.</span>
+                                                    <span class="slide-tools">
+                                                        <button type="button" aria-label="Remove slide"
+                                                            @onclick="() => group.Slides.Remove(slide)">
+                                                            <Icon Name="trash" />
+                                                        </button>
+                                                        <button type="button" aria-label="@(open ? "Collapse slide" : "Expand slide")"
+                                                            aria-expanded="@open" @onclick="() => ToggleSlide(slide)">
+                                                            <Icon Name="chevron" />
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                                @if (open)
+                                                {
+                                                    <textarea id="@SlideDomId(currentGroup, currentSlide)" class="lyric" rows="@Rows(slide)" placeholder=" "
+                                                        data-group="@currentGroup" data-slide="@currentSlide" data-max-lines="@LinesPerSlide"
+                                                        disabled="@(!GroupColors.AllowsLyrics(group.Name))"
+                                                        @onchange="change => ApplyLines(group, currentSlide, change.Value?.ToString())">@SlideText(slide)</textarea>
+                                                }
+                                            </div>
+                                        }
+                                        <button type="button" class="add-slide" aria-label="Add slide"
+                                            @onclick="() => group.Slides.Add(new Slide())">
+                                            <Icon Name="plus" />
+                                        </button>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    </section>
+                </div>
+            }
+        </main>
     }
-</main>
+</div>
+
+@if (busy)
+{
+    <div class="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-card">
+            <span class="spinner"></span>
+            <p>@busyMessage</p>
+        </div>
+    </div>
+}
+
+<InputFile class="page-drop" OnChange="UploadAsync" accept=".pdf,.docx" tabindex="-1" aria-hidden="true" />
+
+<div class="drop-overlay">
+    <div class="drop-card">
+        <Icon Name="upload" />
+        <p>Drop a PDF or Word document anywhere</p>
+    </div>
+</div>
 
 @code {
     const long MaxBytes = 20 * 1024 * 1024;
 
     bool busy;
+    string busyMessage = "Reading document…";
+    int linesPerSlide = 2;
+    bool addBlankIntro = true;
+    int? pendingGroup;
+    int? pendingSlide;
+    bool dark;
     string? error;
     string? status;
+    string downloadName = "songs";
+    string serviceName = "";
+    List<Song>? songs;
+    int selected;
+    readonly HashSet<Slide> collapsed = [];
+    DotNetObjectReference<Home>? dropReference;
+    bool reviewGuardEnabled;
 
-    async Task ConvertAsync(InputFileChangeEventArgs change)
+    Song song => songs![selected];
+
+    int LinesPerSlide
+    {
+        get => linesPerSlide;
+        set => linesPerSlide = Math.Clamp(value, 1, 8);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        dark = await JS.InvokeAsync<string>("theme.current") == "dark";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dropReference = DotNetObjectReference.Create(this);
+            Console.WriteLine("[filedrop] .NET registering drop handler");
+            await JS.InvokeVoidAsync("fileDrop.init", dropReference);
+        }
+
+        var shouldEnableReviewGuard = songs is not null;
+        if (reviewGuardEnabled != shouldEnableReviewGuard)
+        {
+            reviewGuardEnabled = shouldEnableReviewGuard;
+            await JS.InvokeVoidAsync("reviewGuard.setEnabled", shouldEnableReviewGuard);
+        }
+
+        if (pendingGroup is not int groupIndex || pendingSlide is not int slideIndex)
+        {
+            return;
+        }
+
+        pendingGroup = null;
+        pendingSlide = null;
+        await JS.InvokeVoidAsync("focusTextArea", SlideDomId(groupIndex, slideIndex));
+    }
+
+    public void Dispose()
+    {
+        dropReference?.Dispose();
+    }
+
+    async Task ToggleThemeAsync()
+    {
+        dark = await JS.InvokeAsync<string>("theme.toggle") == "dark";
+    }
+
+    async Task UploadAsync(InputFileChangeEventArgs change)
+    {
+        try
+        {
+            var file = change.File;
+            await using var upload = file.OpenReadStream(MaxBytes);
+            using var input = new MemoryStream();
+            await upload.CopyToAsync(input);
+            input.Position = 0;
+            await LoadAsync(file.Name, input);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
+        {
+            error = exception.Message;
+            busy = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task ReceiveDroppedFile(string fileName, byte[] content)
+    {
+        Console.WriteLine($"[filedrop] .NET received {fileName} ({content.LongLength} bytes), busy={busy}");
+        try
+        {
+            if (content.LongLength > MaxBytes)
+            {
+                error = "The file is larger than 20 MB.";
+                status = null;
+                return;
+            }
+
+            using var input = new MemoryStream(content);
+            await LoadAsync(fileName, input);
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine($"[filedrop] .NET failed: {exception}");
+            error = exception.Message;
+            busy = false;
+        }
+
+        StateHasChanged();
+    }
+
+    async Task LoadAsync(string fileName, Stream input)
     {
         error = null;
         status = null;
-        var file = change.File;
-        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
         if (extension is not ".pdf" and not ".docx")
         {
             error = $"Unsupported file type: {extension}";
             return;
         }
 
+        await RunBusy("Reading document…", async () =>
+        {
+            songs = await Conversion.ReadSongsAsync(fileName, input, LinesPerSlide, addBlankIntro);
+            selected = 0;
+            collapsed.Clear();
+            var name = Path.GetFileNameWithoutExtension(fileName);
+            downloadName = string.IsNullOrWhiteSpace(name) ? "songs" : name;
+            serviceName = name;
+        });
+    }
+
+    async Task RunBusy(string message, Func<Task> work)
+    {
+        error = null;
+        status = null;
+        if (busy)
+        {
+            return;
+        }
+
         busy = true;
+        busyMessage = message;
+        StateHasChanged();
         try
         {
-            await using var upload = file.OpenReadStream(MaxBytes);
-            using var input = new MemoryStream();
-            await upload.CopyToAsync(input);
-            input.Position = 0;
-
-            var bundle = Conversion.ToProBundle(file.Name, input);
-            var downloadName = Path.GetFileNameWithoutExtension(file.Name) + ".proBundle";
-            await JS.InvokeVoidAsync("downloadFile", downloadName, bundle);
-            status = $"Downloaded {downloadName}.";
+            await Task.Delay(1);
+            await work();
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
         {
@@ -65,4 +370,172 @@
             busy = false;
         }
     }
+
+    void StartOver()
+    {
+        songs = null;
+        selected = 0;
+        error = null;
+        status = null;
+    }
+
+    async Task DownloadMarkdownAsync()
+    {
+        byte[]? content = null;
+        await RunBusy("Creating Markdown…", () =>
+        {
+            content = Encoding.UTF8.GetBytes(Conversion.ToMarkdown(serviceName, songs!));
+            return Task.CompletedTask;
+        });
+        if (content is not null)
+        {
+            await DownloadAsync(downloadName + ".md", content);
+        }
+    }
+
+    async Task DownloadJsonAsync()
+    {
+        byte[]? content = null;
+        await RunBusy("Creating JSON…", () =>
+        {
+            content = Encoding.UTF8.GetBytes(Conversion.ToJson(songs!));
+            return Task.CompletedTask;
+        });
+        if (content is not null)
+        {
+            await DownloadAsync(downloadName + ".json", content);
+        }
+    }
+
+    async Task DownloadBundleAsync()
+    {
+        byte[]? content = null;
+        await RunBusy("Creating bundle…", async () => content = await Conversion.ToProBundleAsync(songs!));
+        if (content is not null)
+        {
+            await DownloadAsync(downloadName + ".proBundle", content);
+        }
+    }
+
+    async Task DownloadAsync(string fileName, byte[] content)
+    {
+        error = null;
+        status = null;
+        try
+        {
+            await JS.InvokeVoidAsync("downloadFile", fileName, content);
+            status = $"Downloaded {fileName}.";
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
+        {
+            error = exception.Message;
+        }
+    }
+
+    void ToggleSlide(Slide slide)
+    {
+        if (!collapsed.Remove(slide))
+        {
+            collapsed.Add(slide);
+        }
+    }
+
+    string GroupDomId(Groups group) => $"group-{selected}-{song.Groups.IndexOf(group)}";
+
+    async Task ScrollToGroupAsync(Groups group)
+    {
+        var index = song.Groups.IndexOf(group);
+        if (index < 0)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("scrollToId", GroupDomId(group));
+    }
+
+    static string GroupStyle(string name) => $"--group: {GroupColors.Css(name)}";
+
+    int Rows(Slide slide) => Math.Clamp(Math.Max(slide.Lines.Length, 1), 1, LinesPerSlide);
+
+    static string SlideText(Slide slide) => string.Join('\n', slide.Lines);
+
+    string SlideDomId(int groupIndex, int slideIndex) => $"slide-{selected}-{groupIndex}-{slideIndex}";
+
+    void ApplyLines(Groups group, int slideIndex, string? text)
+    {
+        if (slideIndex < 0 || slideIndex >= group.Slides.Count)
+        {
+            return;
+        }
+
+        var lines = ToLines(text);
+        var slide = group.Slides[slideIndex];
+        if (lines.Length <= LinesPerSlide)
+        {
+            slide.Lines = lines;
+            return;
+        }
+
+        slide.Lines = lines.Take(LinesPerSlide).ToArray();
+        var extra = lines.Skip(LinesPerSlide).Chunk(LinesPerSlide).Select(chunk => new Slide { Lines = chunk.ToArray() }).ToList();
+        group.Slides.InsertRange(slideIndex + 1, extra);
+        pendingGroup = song.Groups.IndexOf(group);
+        pendingSlide = slideIndex + 1;
+    }
+
+    [JSInvokable]
+    public void SplitSlide(int groupIndex, int slideIndex, string before, string after)
+    {
+        if (songs is null || selected < 0 || selected >= songs.Count)
+        {
+            return;
+        }
+
+        var group = song.Groups.ElementAtOrDefault(groupIndex);
+        if (group is null || slideIndex < 0 || slideIndex >= group.Slides.Count)
+        {
+            return;
+        }
+
+        var beforeLines = LinesBeforeCaret(before);
+        var afterLines = LinesAfterCaret(after);
+        var overflow = beforeLines.Skip(LinesPerSlide).Concat(afterLines).ToList();
+        group.Slides[slideIndex].Lines = beforeLines.Take(LinesPerSlide).ToArray();
+        var created = overflow.Count == 0
+            ? [new Slide()]
+            : overflow.Chunk(LinesPerSlide).Select(chunk => new Slide { Lines = chunk.ToArray() }).ToList();
+        group.Slides.InsertRange(slideIndex + 1, created);
+        pendingGroup = groupIndex;
+        pendingSlide = beforeLines.Length == 0 && afterLines.Length > 0 ? slideIndex : slideIndex + 1;
+        StateHasChanged();
+    }
+
+    static string[] ToLines(string? text) => SplitNormalized(NormalizeNewLines(text));
+
+    static string[] LinesBeforeCaret(string text)
+    {
+        var normalized = NormalizeNewLines(text);
+        var lines = SplitNormalized(normalized);
+        if (normalized.EndsWith('\n') && lines.Length > 0 && lines[^1].Length == 0)
+        {
+            return lines[..^1];
+        }
+
+        return lines;
+    }
+
+    static string[] LinesAfterCaret(string text)
+    {
+        var normalized = NormalizeNewLines(text);
+        if (normalized.StartsWith('\n'))
+        {
+            normalized = normalized[1..];
+        }
+
+        return SplitNormalized(normalized);
+    }
+
+    static string NormalizeNewLines(string? text) => (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n');
+
+    static string[] SplitNormalized(string normalized) => normalized.Length == 0 ? [] : normalized.Split('\n');
 }

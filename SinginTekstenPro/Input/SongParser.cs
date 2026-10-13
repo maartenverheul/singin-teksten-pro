@@ -29,7 +29,7 @@ static class SongParser
         "EINDE",
     ];
 
-    public static List<Song> Parse(DocumentContent content)
+    public static List<Song> Parse(DocumentContent content, bool addBlankIntro = true)
     {
         var songs = new List<Song>();
         Song? song = null;
@@ -45,7 +45,7 @@ static class SongParser
         {
             if (collecting is not null && lyrics is { Count: > 0 } && song is not null && !IsContentless(collectingKey))
             {
-                var lines = lyrics.Select(line => line.Replace(".", "")).ToArray();
+                var lines = lyrics.Select(line => line.Replace(".", "").Replace(";", "")).ToArray();
                 var text = string.Join('\n', lines);
                 var family = variants[collectingKey];
                 var match = family.FirstOrDefault(group => group.RawText == text);
@@ -206,7 +206,10 @@ static class SongParser
         foreach (var parsed in songs)
         {
             TranslateGroupNames(parsed);
-            EnsureIntro(parsed);
+            if (addBlankIntro)
+            {
+                EnsureIntro(parsed);
+            }
         }
 
         return songs;
@@ -222,26 +225,107 @@ static class SongParser
 
     static void TranslateGroupNames(Song song)
     {
+        foreach (var group in song.Groups)
+        {
+            if (!IsHerhaling(group.Name))
+            {
+                group.Name = TranslateName(group.Name);
+            }
+        }
+
+        Groups? previous = null;
+        foreach (var group in song.GroupOrder)
+        {
+            if (IsHerhaling(group.Name))
+            {
+                group.Name = NameAfter(previous);
+            }
+
+            previous = group;
+        }
+
         var byName = new Dictionary<string, Groups>(StringComparer.OrdinalIgnoreCase);
         var replacements = new Dictionary<Groups, Groups>();
 
         foreach (var group in song.Groups.ToList())
         {
-            group.Name = TranslateName(group.Name);
+            if (IsHerhaling(group.Name))
+            {
+                group.Name = "Other";
+            }
+
             if (byName.TryGetValue(group.Name, out var existing))
             {
-                replacements[group] = existing;
-                song.Groups.Remove(group);
+                if (existing.RawText.Length == 0)
+                {
+                    existing.RawText = group.RawText;
+                    existing.Slides = group.Slides;
+                }
+
+                if (existing.RawText == group.RawText || group.RawText.Length == 0)
+                {
+                    replacements[group] = existing;
+                    song.Groups.Remove(group);
+                    continue;
+                }
+
+                group.Name = NextNumbered(group.Name, byName);
             }
-            else
-            {
-                byName[group.Name] = group;
-            }
+
+            byName[group.Name] = group;
         }
 
         song.GroupOrder = song.GroupOrder
             .Select(group => replacements.GetValueOrDefault(group, group))
             .ToList();
+    }
+
+    static string NameAfter(Groups? previous)
+    {
+        if (previous is null)
+        {
+            return "Other";
+        }
+
+        var (family, number) = SplitNumber(previous.Name);
+        return $"{family} {Math.Max(number, 1) + 1}";
+    }
+
+    static string NextNumbered(string name, Dictionary<string, Groups> taken)
+    {
+        var (family, number) = SplitNumber(name);
+        var next = number > 0 ? number + 1 : 2;
+        var candidate = $"{family} {next}";
+        while (taken.ContainsKey(candidate))
+        {
+            next++;
+            candidate = $"{family} {next}";
+        }
+
+        return candidate;
+    }
+
+    static bool IsHerhaling(string name)
+    {
+        var (family, _) = SplitNumber(name);
+        return family.Equals("HERHALING", StringComparison.OrdinalIgnoreCase);
+    }
+
+    static (string Family, int Number) SplitNumber(string name)
+    {
+        var variant = Regex.Match(name, @"^(.+?) \((\d+)\)$");
+        if (variant.Success)
+        {
+            name = variant.Groups[1].Value;
+        }
+
+        var split = name.LastIndexOf(' ');
+        if (split > 0 && int.TryParse(name[(split + 1)..], out var number))
+        {
+            return (name[..split], number);
+        }
+
+        return (name, 0);
     }
 
     static string TranslateName(string name)
@@ -277,8 +361,8 @@ static class SongParser
 
         return name.ToUpperInvariant() switch
         {
-            "EINDE" => "Ending",
-            _ => name,
+            "EINDE" or "OUTRO" => "Ending",
+            _ => "Other",
         } + suffix;
     }
 

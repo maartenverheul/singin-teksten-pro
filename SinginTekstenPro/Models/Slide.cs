@@ -1,6 +1,6 @@
 namespace SinginTekstenPro.Models;
 
-internal class Slide
+public class Slide
 {
     public string[] Lines { get; set; } = [];
 }

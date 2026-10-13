@@ -1,6 +1,6 @@
 namespace SinginTekstenPro.Models;
 
-internal class Song
+public class Song
 {
     public required string Name { get; set; }
     public List<Groups> Groups { get; set; } = [];
