@@ -4,6 +4,8 @@ Turns a song lyrics document (PDF or Word) into a ProPresenter 7 bundle, with ev
 
 It runs fully in the browser: you upload a document, check and edit the songs, and download the result. Nothing is sent to a server.
 
+![Review screen with the song list, the song's group order and its slides](Screenshot.png)
+
 ## Features
 
 - Reads `.pdf` and `.docx` song sheets
