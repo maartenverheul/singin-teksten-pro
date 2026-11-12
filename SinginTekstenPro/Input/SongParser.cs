@@ -7,7 +7,7 @@ static class SongParser
 {
     static readonly Regex RepeatSuffix = new(@"\s*\((\d+)\s*[xX]\)\s*$", RegexOptions.Compiled);
 
-    static readonly Regex NumberedName = new(@"^(PRE-REFREIN|REFREIN|COUPLET|BRIDGE|VERS)(?:\s+(\d+))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    static readonly Regex NumberedName = new(@"^(PRE-REFREIN|REFREIN|COUPLET|BRIDGE|VERS|TAG)(?:\s+(\d+))?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     static readonly Regex CapitalizedTitleWords = new(@"\b(god|hij|uw|you|u)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
@@ -22,11 +22,13 @@ static class SongParser
         "REFREIN",
         "BRIDGE",
         "VERS",
+        "TAG",
         "OUTRO",
         "INTRO",
         "HERHALING",
         "SLOT",
         "EINDE",
+        "LAATSTE KEER",
     ];
 
     public static List<Song> Parse(DocumentContent content, bool addBlankIntro = true)
@@ -347,6 +349,7 @@ static class SongParser
                 "REFREIN" => "Chorus",
                 "BRIDGE" => "Bridge",
                 "COUPLET" or "VERS" => "Verse",
+                "TAG" => "Tag",
                 _ => match.Groups[1].Value,
             };
 
