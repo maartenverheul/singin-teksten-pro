@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "name": "Library",
+      "path": "./SinginTekstenPro",
+    },
+    {
+      "name": "CLI",
+      "path": "./SinginTekstenPro.Cli",
+    },
+    {
+      "name": "Web",
+      "path": "./SinginTekstenPro.Web",
+    },
+  ],
+  "settings": {},
+}
