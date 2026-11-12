@@ -747,3 +747,40 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+.phone-notice {
+    box-sizing: border-box;
+    max-width: 26rem;
+    margin: 18vh auto 0;
+    padding: 2rem 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    text-align: center;
+    line-height: 1.5;
+}
+
+    .phone-notice h1 {
+        margin: 0.75rem 0 0.5rem;
+        font-size: 1.4rem;
+    }
+
+    .phone-notice p {
+        margin: 0.5rem 0 0;
+    }
+
+.phone-notice-icon {
+    width: 3rem;
+    height: 3rem;
+    color: var(--accent);
+}
+
+.phone-notice-hint {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+@media (max-width: 30rem) {
+    .phone-notice {
+        margin: 12vh 1rem 0;
+    }
+}

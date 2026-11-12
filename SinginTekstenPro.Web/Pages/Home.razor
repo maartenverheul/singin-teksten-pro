@@ -74,16 +74,12 @@
                         ProPresenter
                     </button>
                     <button type="button" class="secondary" disabled="@busy" @onclick="DownloadMarkdownAsync">
-                        <Icon Name="file" />
+                        <Icon Name="download" />
                         Markdown
                     </button>
                     <button type="button" class="secondary" disabled="@busy" @onclick="DownloadJsonAsync">
-                        <Icon Name="braces" />
+                        <Icon Name="download" />
                         JSON
-                    </button>
-                    <button type="button" class="secondary" disabled="@busy" @onclick="StartOver">
-                        <Icon Name="folder" />
-                        Choose another file
                     </button>
                 </div>
             </div>
@@ -378,14 +374,6 @@
         {
             busy = false;
         }
-    }
-
-    void StartOver()
-    {
-        songs = null;
-        selected = 0;
-        error = null;
-        status = null;
     }
 
     async Task DownloadMarkdownAsync()

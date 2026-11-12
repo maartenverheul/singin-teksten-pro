@@ -9,6 +9,7 @@
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="css/app.css" />
     <script src="js/theme.js"></script>
+    <script src="js/phone-guard.js"></script>
     <!-- If you add any scoped CSS files, uncomment the following to load them
     <link href="SinginTekstenPro.Web.styles.css" rel="stylesheet" /> -->
     <script type="importmap"></script>
@@ -236,7 +237,8 @@
                 "").catch((error) => console.error("[lyric] split failed", error));
         }, true);
     </script>
-    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js" autostart="false"></script>
+    <script>window.startApp();</script>
 </body>
 
 </html>
