@@ -63,7 +63,7 @@ static class SongParser
                         family[0].Name = $"{NumberedName.Match(family[0].Name).Groups[1].Value} 1";
                     }
 
-                    var created = new Groups { Name = NextVariantName(song, collectingKey, family.Count + 1), RawText = text };
+                    var created = new Groups { Name = NextVariantName(song, collectingKey), RawText = text };
                     created.Slides.Add(new Slide { Lines = lines });
                     song.Groups.Add(created);
                     family.Add(created);
@@ -362,11 +362,14 @@ static class SongParser
             return "Interlude";
         }
 
-        return name.ToUpperInvariant() switch
+        var (family, number) = SplitNumber(name);
+        var translatedFamily = family.ToUpperInvariant() switch
         {
             "EINDE" or "OUTRO" => "Ending",
             _ => "Other",
-        } + suffix;
+        };
+
+        return (number > 0 ? $"{translatedFamily} {number}" : translatedFamily) + suffix;
     }
 
     static bool IsUnnumbered(string name)
@@ -375,20 +378,21 @@ static class SongParser
         return match.Success && !match.Groups[2].Success;
     }
 
-    static string NextVariantName(Song song, string label, int number)
+    // A repeated label with different lyrics gets the next free number in its family:
+    // "COUPLET" -> "COUPLET 2", "COUPLET 2" -> "COUPLET 3".
+    static string NextVariantName(Song song, string label)
     {
-        var match = NumberedName.Match(label);
+        var (family, number) = SplitNumber(label);
+        var next = Math.Max(number, 1) + 1;
         while (true)
         {
-            var candidate = match.Success && !match.Groups[2].Success
-                ? $"{match.Groups[1].Value} {number}"
-                : $"{label} ({number})";
+            var candidate = $"{family} {next}";
             if (!song.Groups.Any(group => group.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
             {
                 return candidate;
             }
 
-            number++;
+            next++;
         }
     }
 
