@@ -161,7 +161,6 @@
                                             var currentGroup = groupIndex;
                                             var currentSlide = slideIndex;
                                             var number = groupStart + slideIndex + 1;
-                                            var open = !collapsed.Contains(slide);
                                             <div class="slide" @key="slide">
                                                 <div class="slide-bar">
                                                     <span>@number.</span>
@@ -170,19 +169,12 @@
                                                             @onclick="() => group.Slides.Remove(slide)">
                                                             <Icon Name="trash" />
                                                         </button>
-                                                        <button type="button" aria-label="@(open ? "Collapse slide" : "Expand slide")"
-                                                            aria-expanded="@open" @onclick="() => ToggleSlide(slide)">
-                                                            <Icon Name="chevron" />
-                                                        </button>
                                                     </span>
                                                 </div>
-                                                @if (open)
-                                                {
-                                                    <textarea id="@SlideDomId(currentGroup, currentSlide)" class="lyric" rows="@Rows(slide)" placeholder=" "
-                                                        data-group="@currentGroup" data-slide="@currentSlide" data-max-lines="@LinesPerSlide"
-                                                        disabled="@(!GroupColors.AllowsLyrics(group.Name))" value="@SlideText(slide)"
-                                                        @onchange="change => ApplyLines(group, currentSlide, change.Value?.ToString())"></textarea>
-                                                }
+                                                <textarea id="@SlideDomId(currentGroup, currentSlide)" class="lyric" rows="@Rows(slide)" placeholder=" "
+                                                    data-group="@currentGroup" data-slide="@currentSlide" data-max-lines="@LinesPerSlide"
+                                                    disabled="@(!GroupColors.AllowsLyrics(group.Name))" value="@SlideText(slide)"
+                                                    @onchange="change => ApplyLines(group, currentSlide, change.Value?.ToString())"></textarea>
                                             </div>
                                         }
                                         <button type="button" class="add-slide" aria-label="Add slide"
@@ -236,7 +228,6 @@
     string serviceName = "";
     List<Song>? songs;
     int selected;
-    readonly HashSet<Slide> collapsed = [];
     readonly HashSet<Song> excluded = [];
     DotNetObjectReference<Home>? dropReference;
     bool reviewGuardEnabled;
@@ -351,7 +342,6 @@
         {
             songs = await Conversion.ReadSongsAsync(fileName, input, LinesPerSlide, addBlankIntro);
             selected = 0;
-            collapsed.Clear();
             excluded.Clear();
             var name = Path.GetFileNameWithoutExtension(fileName);
             downloadName = string.IsNullOrWhiteSpace(name) ? "songs" : name;
@@ -470,14 +460,6 @@
         }
     }
 
-    void ToggleSlide(Slide slide)
-    {
-        if (!collapsed.Remove(slide))
-        {
-            collapsed.Add(slide);
-        }
-    }
-
     string GroupDomId(Groups group) => $"group-{selected}-{song.Groups.IndexOf(group)}";
 
     async Task ScrollToGroupAsync(Groups group)
@@ -582,7 +564,6 @@
             group.Slides.RemoveAt(slideIndex);
         }
 
-        collapsed.Remove(previous);
         pendingGroup = groupIndex;
         pendingSlide = slideIndex - 1;
         pendingCaret = previous.Lines.Length > 1 ? previousText.Length + 1 : previousText.Length;

@@ -556,13 +556,8 @@ input.group-name {
     color: #f3f3f3;
 }
 
-.slide-bar button:hover,
-.slide-bar button[aria-expanded="false"] {
+.slide-bar button:hover {
     background: #444;
-}
-
-.slide-bar button[aria-expanded="false"] .icon {
-    transform: rotate(180deg);
 }
 
 .lyric {
