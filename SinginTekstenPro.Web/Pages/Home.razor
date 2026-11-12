@@ -108,11 +108,21 @@
                         @for (var index = 0; index < songs.Count; index++)
                         {
                             var songIndex = index;
-                            <button type="button" class="@(songIndex == selected ? "selected" : null)"
-                                @onclick="() => selected = songIndex">
-                                <span class="song-index">@(songIndex + 1)</span>
-                                <span>@(string.IsNullOrWhiteSpace(songs[songIndex].Name) ? "Untitled" : songs[songIndex].Name)</span>
-                            </button>
+                            var listed = songs[songIndex];
+                            var isExcluded = excluded.Contains(listed);
+                            <div class="song-item @(songIndex == selected ? "selected" : null) @(isExcluded ? "excluded" : null)">
+                                <button type="button" class="song-select"
+                                    disabled="@isExcluded" @onclick="() => selected = songIndex">
+                                    <span class="song-index">@(songIndex + 1)</span>
+                                    <span class="song-name">@(string.IsNullOrWhiteSpace(listed.Name) ? "Untitled" : listed.Name)</span>
+                                </button>
+                                <button type="button" class="song-toggle @(isExcluded ? null : "remove")"
+                                    aria-label="@(isExcluded ? "Include song" : "Remove song")"
+                                    title="@(isExcluded ? "Include song" : "Remove song")"
+                                    @onclick="() => ToggleExcluded(listed)">
+                                    <Icon Name="@(isExcluded ? "plus" : "cross")" />
+                                </button>
+                            </div>
                         }
                     </nav>
 
@@ -226,6 +236,7 @@
     List<Song>? songs;
     int selected;
     readonly HashSet<Slide> collapsed = [];
+    readonly HashSet<Song> excluded = [];
     DotNetObjectReference<Home>? dropReference;
     bool reviewGuardEnabled;
 
@@ -338,6 +349,7 @@
             songs = await Conversion.ReadSongsAsync(fileName, input, LinesPerSlide, addBlankIntro);
             selected = 0;
             collapsed.Clear();
+            excluded.Clear();
             var name = Path.GetFileNameWithoutExtension(fileName);
             downloadName = string.IsNullOrWhiteSpace(name) ? "songs" : name;
             serviceName = name;
@@ -384,7 +396,7 @@
         byte[]? content = null;
         await RunBusy("Creating Markdown…", () =>
         {
-            content = Encoding.UTF8.GetBytes(Conversion.ToMarkdown(serviceName, songs!));
+            content = Encoding.UTF8.GetBytes(Conversion.ToMarkdown(serviceName, IncludedSongs));
             return Task.CompletedTask;
         });
         if (content is not null)
@@ -398,7 +410,7 @@
         byte[]? content = null;
         await RunBusy("Creating JSON…", () =>
         {
-            content = Encoding.UTF8.GetBytes(Conversion.ToJson(songs!));
+            content = Encoding.UTF8.GetBytes(Conversion.ToJson(IncludedSongs));
             return Task.CompletedTask;
         });
         if (content is not null)
@@ -410,7 +422,7 @@
     async Task DownloadBundleAsync()
     {
         byte[]? content = null;
-        await RunBusy("Creating bundle…", async () => content = await Conversion.ToProBundleAsync(songs!));
+        await RunBusy("Creating bundle…", async () => content = await Conversion.ToProBundleAsync(IncludedSongs));
         if (content is not null)
         {
             await DownloadAsync(downloadName + ".proBundle", content);
@@ -429,6 +441,29 @@
         catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
         {
             error = exception.Message;
+        }
+    }
+
+    List<Song> IncludedSongs => songs!.Where(item => !excluded.Contains(item)).ToList();
+
+    void ToggleExcluded(Song target)
+    {
+        if (excluded.Remove(target))
+        {
+            return;
+        }
+
+        excluded.Add(target);
+        if (ReferenceEquals(song, target))
+        {
+            var next = Enumerable.Range(1, songs!.Count - 1)
+                .Select(offset => (selected + offset) % songs.Count)
+                .Cast<int?>()
+                .FirstOrDefault(index => !excluded.Contains(songs[index!.Value]));
+            if (next is int index)
+            {
+                selected = index;
+            }
         }
     }
 

@@ -88,6 +88,7 @@
     --slide: #f3f7fa;
     --status: #0d6b3a;
     --error: #9d1c1c;
+    --remove: #7a0f0f;
 }
 
 :root[data-theme="dark"] {
@@ -103,6 +104,7 @@
     --slide: #121820;
     --status: #8fd0a8;
     --error: #ffb4b4;
+    --remove: #e04848;
 }
 
 body {
@@ -199,8 +201,92 @@ button {
     text-align: left;
 }
 
-.song-list button {
-    width: 100%;
+.song-item {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.song-item:hover {
+    border-color: var(--accent);
+}
+
+.song-item.selected {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+    font-weight: 600;
+}
+
+.song-item button {
+    border: none;
+    background: transparent;
+    color: inherit;
+}
+
+.song-item .song-select {
+    flex: 1;
+    min-width: 0;
+    padding-right: 0.25rem;
+}
+
+.song-item .song-toggle {
+    flex: none;
+    padding: 0.3rem;
+    margin-right: 0.2rem;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+
+.song-item:hover .song-toggle,
+.song-item:focus-within .song-toggle {
+    opacity: 0.7;
+}
+
+.song-item .song-toggle:hover,
+.song-item .song-toggle:focus-visible {
+    opacity: 1;
+}
+
+.song-item .song-toggle.remove {
+    color: var(--remove);
+}
+
+.song-item.selected .song-toggle.remove {
+    background: var(--surface);
+}
+
+@media (hover: none) {
+    .song-item .song-toggle {
+        opacity: 0.7;
+    }
+}
+
+.song-item.selected .song-index {
+    color: inherit;
+}
+
+.song-item.excluded {
+    border-style: dashed;
+    background: transparent;
+    color: var(--muted);
+}
+
+.song-item.excluded:hover {
+    border-color: var(--border);
+}
+
+.song-item.excluded .song-select {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.song-item.excluded .song-name {
+    text-decoration: line-through;
 }
 
 .song-index {
@@ -211,11 +297,6 @@ button {
     font-weight: 600;
 }
 
-.song-list button.selected .song-index {
-    color: inherit;
-}
-
-.song-list button.selected,
 button.primary {
     background: var(--accent);
     color: var(--accent-text);
