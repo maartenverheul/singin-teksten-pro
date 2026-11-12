@@ -180,8 +180,8 @@
                                                 {
                                                     <textarea id="@SlideDomId(currentGroup, currentSlide)" class="lyric" rows="@Rows(slide)" placeholder=" "
                                                         data-group="@currentGroup" data-slide="@currentSlide" data-max-lines="@LinesPerSlide"
-                                                        disabled="@(!GroupColors.AllowsLyrics(group.Name))"
-                                                        @onchange="change => ApplyLines(group, currentSlide, change.Value?.ToString())">@SlideText(slide)</textarea>
+                                                        disabled="@(!GroupColors.AllowsLyrics(group.Name))" value="@SlideText(slide)"
+                                                        @onchange="change => ApplyLines(group, currentSlide, change.Value?.ToString())"></textarea>
                                                 }
                                             </div>
                                         }
@@ -228,6 +228,7 @@
     bool addBlankIntro = true;
     int? pendingGroup;
     int? pendingSlide;
+    int pendingCaret;
     bool dark;
     string? error;
     string? status;
@@ -274,9 +275,11 @@
             return;
         }
 
+        var caret = pendingCaret;
         pendingGroup = null;
         pendingSlide = null;
-        await JS.InvokeVoidAsync("focusTextArea", SlideDomId(groupIndex, slideIndex));
+        pendingCaret = 0;
+        await JS.InvokeVoidAsync("focusTextArea", SlideDomId(groupIndex, slideIndex), caret);
     }
 
     public void Dispose()
@@ -542,6 +545,47 @@
         group.Slides.InsertRange(slideIndex + 1, created);
         pendingGroup = groupIndex;
         pendingSlide = beforeLines.Length == 0 && afterLines.Length > 0 ? slideIndex : slideIndex + 1;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void MergeSlideUp(int groupIndex, int slideIndex, string text)
+    {
+        if (songs is null || selected < 0 || selected >= songs.Count || LinesPerSlide < 2)
+        {
+            return;
+        }
+
+        var group = song.Groups.ElementAtOrDefault(groupIndex);
+        if (group is null || slideIndex < 1 || slideIndex >= group.Slides.Count)
+        {
+            return;
+        }
+
+        // Blank lines don't count as lines, in either slide.
+        var current = ToLines(text).Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
+        var previous = group.Slides[slideIndex - 1];
+        var previousLines = previous.Lines.Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
+        if (previousLines.Length >= LinesPerSlide)
+        {
+            return;
+        }
+
+        var previousText = string.Join('\n', previousLines);
+        previous.Lines = previousLines.Concat(current.Take(1)).ToArray();
+        if (current.Length > 1)
+        {
+            group.Slides[slideIndex].Lines = current[1..];
+        }
+        else
+        {
+            group.Slides.RemoveAt(slideIndex);
+        }
+
+        collapsed.Remove(previous);
+        pendingGroup = groupIndex;
+        pendingSlide = slideIndex - 1;
+        pendingCaret = previous.Lines.Length > 1 ? previousText.Length + 1 : previousText.Length;
         StateHasChanged();
     }
 

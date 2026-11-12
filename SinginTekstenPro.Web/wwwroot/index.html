@@ -148,14 +148,15 @@
             return String(value ?? "").split(/\r\n|\r|\n/).length;
         }
 
-        window.focusTextArea = (id) => {
+        window.focusTextArea = (id, caret) => {
             const area = document.getElementById(id);
             if (!area) {
                 return;
             }
 
+            const position = Math.min(Math.max(Number(caret) || 0, 0), area.value.length);
             area.focus();
-            area.setSelectionRange(0, 0);
+            area.setSelectionRange(position, position);
             area.closest(".slide")?.scrollIntoView({ block: "nearest" });
         };
 
@@ -165,7 +166,27 @@
                 return;
             }
 
-            if (event.key !== "Enter" || event.isComposing) {
+            if (event.isComposing) {
+                return;
+            }
+
+            if (event.key === "Backspace") {
+                const slide = Number(area.dataset.slide);
+                const atStart = area.selectionStart === 0 && area.selectionEnd === 0;
+                if (!atStart || slide < 1) {
+                    return;
+                }
+
+                event.preventDefault();
+                window.fileDrop.dotNet?.invokeMethodAsync(
+                    "MergeSlideUp",
+                    Number(area.dataset.group),
+                    slide,
+                    area.value).catch((error) => console.error("[lyric] merge failed", error));
+                return;
+            }
+
+            if (event.key !== "Enter") {
                 return;
             }
 
