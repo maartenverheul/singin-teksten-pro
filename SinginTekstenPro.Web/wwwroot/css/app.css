@@ -784,3 +784,10 @@ code {
         margin: 12vh 1rem 0;
     }
 }
+
+.version {
+    margin: 1.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: right;
+}

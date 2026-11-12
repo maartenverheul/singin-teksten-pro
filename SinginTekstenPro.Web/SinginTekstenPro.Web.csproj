@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- Shown on the upload screen. -->
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,8 +32,7 @@
   </PropertyGroup>
 
   <Target Name="RunWrangler" AfterTargets="Publish" Condition="'$(Cloudflare)' != ''">
-    <Error Condition="'$(Cloudflare)' != 'deploy' and '$(Cloudflare)' != 'preview'"
-      Text="Cloudflare must be 'deploy' or 'preview', not '$(Cloudflare)'." />
+    <Error Condition="'$(Cloudflare)' != 'deploy' and '$(Cloudflare)' != 'preview'" Text="Cloudflare must be 'deploy' or 'preview', not '$(Cloudflare)'." />
     <PropertyGroup>
       <WranglerCommand Condition="'$(Cloudflare)' == 'deploy'">deploy</WranglerCommand>
       <WranglerCommand Condition="'$(Cloudflare)' == 'preview'">dev</WranglerCommand>

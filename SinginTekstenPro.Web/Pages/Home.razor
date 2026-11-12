@@ -59,6 +59,7 @@
             {
                 <p class="error">@error</p>
             }
+            <p class="version">Version @AppVersion</p>
         </main>
     }
     else
@@ -213,6 +214,13 @@
 
 @code {
     const long MaxBytes = 20 * 1024 * 1024;
+
+    // <Version> from the .csproj; the SDK appends "+<commit hash>", which is dropped here.
+    static readonly string AppVersion = (typeof(Home).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+        .FirstOrDefault()?.InformationalVersion ?? "?")
+        .Split('+')[0];
 
     bool busy;
     string busyMessage = "Reading document…";
