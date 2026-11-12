@@ -12,6 +12,10 @@
       "name": "Web",
       "path": "./SinginTekstenPro.Web",
     },
+    {
+      "name": "*",
+      "path": "./",
+    },
   ],
   "settings": {},
 }

@@ -77,11 +77,16 @@ dotnet run --project SinginTekstenPro.Cli -- path/to/songs.pdf
 
 ### Publishing
 
+The web app is hosted as a [Cloudflare Worker](https://developers.cloudflare.com/workers/static-assets/) with static assets only. Deploying runs Cloudflare's Wrangler tool through `npx`, so you need [Node.js](https://nodejs.org/) installed and a Cloudflare account. No `npm install` is needed.
+
 ```sh
-dotnet publish SinginTekstenPro.Web -c Release
+npx wrangler login   # once
+dotnet publish SinginTekstenPro.Web -c Release -p:Cloudflare=deploy
 ```
 
-The static site ends up in `SinginTekstenPro.Web/bin/Release/net10.0/publish/wwwroot` and can be hosted on any static file host.
+This publishes the app to `dist/web/wwwroot` and uploads that folder. Use `-p:Cloudflare=preview` instead to try the published build locally first. The Worker settings are in [`wrangler.jsonc`](wrangler.jsonc); the build steps are at the bottom of [`SinginTekstenPro.Web.csproj`](SinginTekstenPro.Web/SinginTekstenPro.Web.csproj).
+
+The published folder is a plain static site, so it can also be hosted anywhere else that serves static files.
 
 ## Project structure
 

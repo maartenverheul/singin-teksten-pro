@@ -16,4 +16,27 @@
     <ProjectReference Include="..\SinginTekstenPro\SinginTekstenPro.csproj" />
   </ItemGroup>
 
+  <!--
+    Cloudflare Worker hosting (see ../wrangler.jsonc). Wrangler needs Node.js installed; it is run through npx.
+      dotnet publish SinginTekstenPro.Web -c Release -p:Cloudflare=deploy    upload to Cloudflare
+      dotnet publish SinginTekstenPro.Web -c Release -p:Cloudflare=preview   serve the published build locally
+  -->
+  <PropertyGroup Condition="'$(Cloudflare)' != ''">
+    <WranglerVersion>4.161.0</WranglerVersion>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))</RepositoryRoot>
+    <PublishDir>$(RepositoryRoot)\dist\web\</PublishDir>
+    <!-- Cloudflare compresses responses itself, so skip the .br/.gz copies of every file. -->
+    <CompressionEnabled>false</CompressionEnabled>
+  </PropertyGroup>
+
+  <Target Name="RunWrangler" AfterTargets="Publish" Condition="'$(Cloudflare)' != ''">
+    <Error Condition="'$(Cloudflare)' != 'deploy' and '$(Cloudflare)' != 'preview'"
+      Text="Cloudflare must be 'deploy' or 'preview', not '$(Cloudflare)'." />
+    <PropertyGroup>
+      <WranglerCommand Condition="'$(Cloudflare)' == 'deploy'">deploy</WranglerCommand>
+      <WranglerCommand Condition="'$(Cloudflare)' == 'preview'">dev</WranglerCommand>
+    </PropertyGroup>
+    <Exec Command="npx --yes wrangler@$(WranglerVersion) $(WranglerCommand)" WorkingDirectory="$(RepositoryRoot)" />
+  </Target>
+
 </Project>

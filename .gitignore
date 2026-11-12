@@ -1,4 +1,4 @@
-[Bb]in/
+﻿[Bb]in/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
@@ -28,3 +28,7 @@ coverage*
 *.pro
 !Template.pro
 *.proBundle
+
+# Cloudflare Worker deploy
+dist/
+.wrangler/

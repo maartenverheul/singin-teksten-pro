@@ -1,0 +1,10 @@
+{
+	"name": "singin-teksten-pro",
+	"compatibility_date": "2026-11-12",
+	// Assets-only Worker: the Blazor WebAssembly app is fully static, so there is no Worker script.
+	// Deploy with `dotnet publish SinginTekstenPro.Web -c Release -p:Cloudflare=deploy`, which builds the folder below first.
+	"assets": {
+		"directory": "./dist/web/wwwroot",
+		"not_found_handling": "single-page-application"
+	}
+}
